@@ -1,0 +1,24 @@
+Airmedia MAC address - Corporate Wifi
+
+
+
+AV VLAN - 5 Ports
+
+DHCP
+1-149, 150 - 253 Static
+
+254 Gateway
+
+
+
+Blackmores Font:
+
+Avenir Next
+
+Deep Grey - R 30, G 77, B 90
+Teal - 	R 0, 6 165, B 178
+Mid Grey - R 19, G 126, B 150
+Mist - R 217, G 217, B 214
+White - R 255, G 255, B 255
+
+
