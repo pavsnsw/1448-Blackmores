@@ -1,0 +1,156 @@
+[BEGIN]
+  Version=1
+[END]
+[BEGIN]
+  ObjTp=FSgntr
+  Sgntr=UserSPlus
+  RelVrs=1
+  IntStrVrs=1
+  SPlusVrs=4.04.01
+  CrossCplrVrs=NOT INSTALLED
+[END]
+[BEGIN]
+  ObjTp=Hd
+[END]
+[BEGIN]
+  ObjTp=Symbol
+  Exclusions=1,19,20,21,88,89,167,168,179,213,214,215,216,217,225,226,248,249,266,267,310,362,378,380,405,407,408,409,478,522,537,554,586,590,611,624,718,756,767,830,841,842,854,883,955,1032,1062,1079,1128,1129,1134,1140,1157,1158,1195,1199,1220,1221,1222,1223,1299,1348,1349,1439,1472,1473,1499,1746,1803,1975,2229,2354,2514,2523,2532,2706,2707,3235,3236,3427,3454,3567,3568,3601,3602,3708,3902,3903,3912,3918,3925,3926,4206,4207,
+  Exclusions_CDS=5
+  Inclusions_CDS=6
+  Name=CBus Blind Controller-Hall-Wilcox
+  SmplCName=CBus Blind Controller-Hall-Wilcox.usp
+  Code=1
+  SysRev5=4.006
+  SMWRev=3.00.00
+  InputCue1=Blinds_up_1_bt
+  InputSigType1=Digital
+  InputCue2=Blinds_up_2_bt
+  InputSigType2=Digital
+  InputCue3=Blinds_up_3_bt
+  InputSigType3=Digital
+  InputCue4=Blinds_dn_1_bt
+  InputSigType4=Digital
+  InputCue5=Blinds_dn_2_bt
+  InputSigType5=Digital
+  InputCue6=Blinds_dn_3_bt
+  InputSigType6=Digital
+  InputCue7=Blinds_stop_1_bt
+  InputSigType7=Digital
+  InputCue8=Blinds_stop_2_bt
+  InputSigType8=Digital
+  InputCue9=Blinds_stop_3_bt
+  InputSigType9=Digital
+  InputList2Cue1=From_Cbus
+  InputList2SigType1=Serial
+  OutputList2Cue1=To_CBus
+  OutputList2SigType1=Serial
+  ParamCue1=[Reference Name]
+  ParamCue2=[~UNUSED~]
+  ParamSigType2=Constant
+  ParamCue3=[~UNUSED~]
+  ParamSigType3=Constant
+  ParamCue4=[~UNUSED~]
+  ParamSigType4=Constant
+  ParamCue5=[~UNUSED~]
+  ParamSigType5=Constant
+  ParamCue6=[~UNUSED~]
+  ParamSigType6=Constant
+  ParamCue7=[~UNUSED~]
+  ParamSigType7=Constant
+  ParamCue8=[~UNUSED~]
+  ParamSigType8=Constant
+  ParamCue9=[~UNUSED~]
+  ParamSigType9=Constant
+  ParamCue10=[~UNUSED~]
+  ParamSigType10=Constant
+  ParamCue11=[~UNUSED~]
+  ParamSigType11=Constant
+  ParamCue12=[~UNUSED~]
+  ParamSigType12=Constant
+  ParamCue13=Application
+  ParamSigType13=String
+  ParamCue14=CBusAddresses[1]
+  ParamSigType14=String
+  ParamCue15=CBusAddresses[2]
+  ParamSigType15=String
+  ParamCue16=CBusAddresses[3]
+  ParamSigType16=String
+  MinVariableInputs=9
+  MaxVariableInputs=9
+  MinVariableInputsList2=1
+  MaxVariableInputsList2=1
+  MinVariableOutputs=0
+  MaxVariableOutputs=0
+  MinVariableOutputsList2=1
+  MaxVariableOutputsList2=1
+  MinVariableParams=13
+  MaxVariableParams=15
+  Expand=expand_separately
+  Expand2=expand_separately
+  ProgramTree=Logic
+  SymbolTree=32
+  Hint=
+  PdfHelp=
+  HelpID= 
+  Render=4
+  Smpl-C=16
+  CompilerCode=-48
+  CompilerParamCode=27
+  CompilerParamCode5=14
+  NumFixedParams=1
+  Pp1=1
+  Pp13=13
+  Pp14=14
+  Pp15=15
+  Pp16=16
+  MPp=16
+  NVStorage=10
+  ParamSigType1=String
+  SmplCInputCue1=o#
+  SmplCOutputCue1=i#
+  SmplCInputList2Cue1=an#
+  SmplCOutputList2Cue1=ai#
+  SPlus2CompiledName=S2_CBus_Blind_Controller_Hall_Wilcox
+  SymJam=NonExclusive
+  FileName=CBus Blind Controller-Hall-Wilcox.ush
+  SIMPLPlusModuleEncoding=0
+  clz1=BiampTesiraLib3
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=1
+  Tp=1
+  NoS=False
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=13
+  Tp=1
+  HD=False
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=14
+  Tp=1
+  HD=False
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=15
+  Tp=1
+  HD=False
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=16
+  Tp=1
+  HD=False
+  NoS=False
+  VVS=0
+[END]
