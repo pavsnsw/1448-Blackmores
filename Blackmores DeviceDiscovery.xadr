@@ -1,0 +1,13 @@
+[Crestron_Toolbox_Address_Book]
+
+[AddressBookInfo]
+Schema=3.0
+Version=1.0
+DefaultEntry=
+
+[ComSpecs]
+CP4N-Blackmores=auto CP4N-C442680F9CE7;username admin;password passwrod1
+
+[Notes]
+CP4N-Blackmores=CP4N
+

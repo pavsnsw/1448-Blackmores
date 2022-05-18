@@ -1,0 +1,710 @@
+/*******************************************************************************************
+  SIMPL+ Module Information
+  (Fill in comments below)
+*******************************************************************************************/
+/*
+Dealer Name: VisionX / PI / TechFM
+System Name:
+System Number:
+Programmer: The Meat aka Adam Kohler - ACK
+Comments:
+
+Quick Fix Hack for Westpac
+Now evolved for further Samsung LCD Control
+Is now continuing to be evolved into a proper Samsung Module slowly.
+
+*/
+
+/*******************************************************************************************
+  Compiler Directives
+  (Uncomment and declare compiler directives as needed)
+*******************************************************************************************/
+// #ENABLE_DYNAMIC
+// #SYMBOL_NAME ""
+// #HINT ""
+
+#DEFINE_CONSTANT STATUSCONTROL	0
+#DEFINE_CONSTANT VIDEOCONTROL 	4
+#DEFINE_CONSTANT RGBCONTROL   	6
+#DEFINE_CONSTANT SOUNDCONTROL	9
+#DEFINE_CONSTANT SERIAL			11 // \x0B
+#DEFINE_CONSTANT MAINTAIN		13 // \x0D
+#DEFINE_CONSTANT SOFTWARE		14 // \x0E
+#DEFINE_CONSTANT POWER			17 // \x11
+#DEFINE_CONSTANT VOLCONTROL		18 // \x12
+#DEFINE_CONSTANT MUTECONTROL	19 // \x13
+#DEFINE_CONSTANT INPUTS			20 // \x14
+#DEFINE_CONSTANT LAMPTIME		131 // \x83
+#DEFINE_CONSTANT DTVCHANNEL		23	// \x17
+#DEFINE_CONSTANT CHANCONTROL	97 // \x61
+#DEFINE_CONSTANT VIRTUAL		176
+#DEFINE_CONSTANT FF_ACK			255
+
+// #CATEGORY "" 
+// #PRINT_TO_TRACE
+// #DIGITAL_EXPAND 
+// #ANALOG_SERIAL_EXPAND 
+// #OUTPUT_SHIFT 
+// #HELP_PDF_FILE ""
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+// #ENCODING_ASCII
+// #ENCODING_UTF16
+// #ENCODING_INHERIT_FROM_PARENT
+// #ENCODING_INHERIT_FROM_PROGRAM
+
+#HELP_BEGIN
+Help is on the way.
+
+
+Just shine the batman symbol to the sky at night and hope for the best.
+
+LCDInput FB:
+\x14 = 20 = PC
+\x21 = 33 = HDMI 1
+\x23 = 35 = HDMI 2
+\x25 = 37 = Dport
+\x40 = 64 = DTV
+\x50 = 80 = Plug In Module
+\x55 = 85 = HDBaseT
+\x20 = 32 = MagicInfo
+\x18 = 24 = DVI
+
+Will be properly documenting signal expectations and what known issues are as well as proper umc packaging soon.
+Hasnt been edited since 2016ish.. now late 2018 will get back into it.
+LCD Drive is accepting to 0 - 100% and adpats back to protocol limits of 0 to 100.
+Rescales back up for a gauge drive.
+
+TCP / IP Control is on Port 1515
+
+Version 1.2: Has RF input, and channel selection controls, More Inputs.
+Version 1.3: Channel Up and Down added for DTV. I really need to invest some time into making this an epic module.. the protocol is easy to read.
+
+#HELP_END
+
+
+/*******************************************************************************************
+  Include Libraries
+  (Uncomment and include additional libraries as needed)
+*******************************************************************************************/
+// #CRESTRON_LIBRARY ""
+// #USER_LIBRARY ""
+
+/*******************************************************************************************
+  DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
+  (Uncomment and declare inputs and outputs as needed)
+*******************************************************************************************/
+DIGITAL_INPUT RequestSerial, RequestSoftwareVer, RequestMaintenanceInfo,_skip_, LCD_Status_Req ,LCD_Panel_Runtime,_skip_, Key_Menu, Key_Return, Key_Enter, Key_Up, Key_Down, Key_Left, Key_Right, Key_Tools, Key_Exit;
+DIGITAL_INPUT _skip_,LCD_Power_On, LCD_Power_Off,_skip_,Input_HDMI1,Input_HDMI2,Input_HDMI3,Input_DVI,Input_DPORT,Input_VGA,Input_DTV,Input_PIM,Input_HDBaseT,Input_MagicInfo;
+DIGITAL_INPUT _skip_,Volume_Up,Volume_Down,Mute,Unmute,Mute_Toggle,Vol_Reset, _skip_, Channel_Up, Channel_Down;
+DIGITAL_INPUT _skip_, Key_Number[10];
+ANALOG_INPUT LCD_ID,Volume_Default, Volume_Slider_Drive,TV_Channel,_skip_;
+//STRING_INPUT LCD_ID[5];
+ BUFFER_INPUT LCD_RXD$[255];
+
+DIGITAL_OUTPUT LCD_IS_ON, LCD_is_responding,LCD_Mute_FB;
+ANALOG_OUTPUT LCDTemperature, LCDCurrentInput,LCDRunTime,LCDVolumeLevel;
+STRING_OUTPUT LCD_TXD$, LCD_SERIAL, LCD_SOFTWARE;
+
+/*******************************************************************************************
+  Global Variables
+  (Uncomment and declare global variables as needed)
+  Note:  Be sure to initialize all declared STRING variables as needed
+         For example, in Function Main: myString = "";
+*******************************************************************************************/
+INTEGER iBusy, lastcommand, iLoop, iTemp, iCon, iCount, iTemperature, iPower, iInput, iID, iCH;
+INTEGER iPowerReq, iRunTime, iVolume, iMute;
+// LONG_INTEGER
+// SIGNED_INTEGER
+// SIGNED_LONG_INTEGER
+STRING sSerialN[40], sSoftware[40], sTemp[255];
+STRING sTrash[40], sID[5], sID2[2], sBuild[40];
+
+/*******************************************************************************************
+  Functions
+  (Add any additional functions here)
+  Note:  Functions must be physically placed before the location in
+         the code that calls them.
+*******************************************************************************************/
+
+String_Function AddCSToString(STRING StringSend)
+{
+	INTEGER a, iCS, iLength;
+	STRING sStringFinal[50], sStringTemp[50];
+
+	IF(FIND("\xAA", StringSend) > 0)
+     {
+        	iLength=Len(StringSend);
+			sStringTemp = MID(StringSend,2,(iLength - 1));
+
+			iCS = 0;
+			for(a = 1 to len(sStringTemp)) // Was 1
+			{
+				iCS = iCS + byte(sStringTemp, a);
+			}
+
+			//iCS = (0x0100 - iCS);
+			
+			sStringFinal = StringSend + chr(iCS);
+	}
+	Return (sStringFinal);
+}
+
+Function PowerStatusComp()
+{
+	switch(iPower)
+	{
+		case(0):
+		{
+			if(iPowerReq = 1) // TV is off, but request is on
+			{
+				makestring(sBuild, "\xAA\x11%s\x01\x01", sID); // Power On Command
+				LCD_TXD$ = AddCSToString(sBuild);
+			}				
+		}
+		case(1):
+		{
+			if(iPowerReq = 0)
+			{
+            	makestring(sBuild, "\xAA\x11%s\x01\x00", sID); // Power Off command
+				LCD_TXD$ = AddCSToString(sBuild);
+			}
+		}
+	}
+}
+
+Function ResetVolume()
+{
+	iVolume = Volume_default / 655;
+    lastcommand = VOLCONTROL;
+	makestring(sBuild, "\xAA\x12%s\x01%s", sID, chr(iVolume));
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+
+Function ProcessRXD(string sFB)
+{
+	integer iRRR;
+
+	switch (lastCommand)
+	{
+		case (STATUSCONTROL):
+		{
+			if (byte(sFB, 4) = 9)
+			{
+				iPower = byte(sFB, 7);
+				iVolume = byte(sFB, 8);
+                LCDVolumeLevel = iVolume * 655;
+				iMute = byte(sFB, 9);
+                LCD_Mute_FB = iMute;
+				iInput = byte(sFB, 10);
+				LCD_IS_ON = iPower;
+				LCDCurrentInput = iInput;
+				lastCommand=255;
+				PowerStatusComp();
+				if(byte(sFB, 3) = iID)
+				{
+    				LCD_is_responding = 1;
+				}
+				else
+				{
+                    LCD_is_responding = 0;
+				}								
+			}
+		}
+		case (VIDEOCONTROL):
+		{
+			if (byte(sFB, 4) = 10)
+			{
+				//contrast_fb$ = byte(rx$, 7);	
+				//brightness_fb$ = byte(rx$, 8);
+				//sharpness_fb$ = byte(rx$, 9);			
+				//color_fb$ = byte(rx$, 10);			
+				//tint_fb$ = byte(rx$, 11);			
+				lastCommand=255;								
+			}
+		}
+		case (SERIAL):
+		{
+			if (byte(sFB, 6) = 11) // 0B is 11
+			{
+   				// New serial number building
+				sTrash = remove("\x0B",sFB,4); // instead of starting at the start, need to get past the ID section which could conflict
+				iCount = len(sFB);
+                iCount = iCount - 4;
+				sSerialN = mid(sFB, 1, iCount);
+				lastCommand=255;
+				LCD_SERIAL = sSerialN;								
+			}
+		}
+		case (SOFTWARE):
+		{
+			if (byte(sFB, 6) = 14) // 0E is 14
+			{
+				sTrash = remove("\x0E",sFB,4); // instead of starting at 1, start at 4 to jump over ID byte
+				iCount = len(sFB);
+                iCount = iCount - 1;
+				sSoftware = mid(sFB, 1, iCount);
+				lastCommand=255;
+				LCD_SOFTWARE = sSoftware;								
+			}
+		}
+		CASE (MAINTAIN):
+		{
+        	if (byte(sFB, 6) = 13) // 0D is 13
+			{
+				iTemperature = byte(sFB, 11);
+				LCDTemperature = iTemperature;
+				lastCommand=255;
+				if(byte(sFB, 3) = iID)
+				{
+    				LCD_is_responding = 1;
+				}
+				else
+				{
+                    LCD_is_responding = 0;
+				}
+			}
+		}
+		CASE (VIRTUAL):
+		{
+        	if (byte(sFB, 6) = 176) // B0 is 176
+			{
+				// virtual remote return string
+				lastcommand = 255;
+			}
+		}
+        CASE (POWER):
+		{
+        	if (byte(sFB, 5) = 65) // A is ASCII 41 which equals 65 decimal - Acknowledge
+			{
+				iPower = byte(sFB,7);
+				LCD_IS_ON = iPower;
+				lastcommand = 255;
+				if(byte(sFB, 3) = iID)
+				{
+    				LCD_is_responding = 1;
+				}
+				else
+				{
+                    LCD_is_responding = 0;
+				}
+			}
+		}
+		CASE (INPUTS):
+		{
+        	if (byte(sFB, 6) = 20) // 14 is 20
+			{
+				iInput = byte(sFB,7);
+                LCDCurrentInput = iInput;
+
+				lastcommand = 255;
+			}
+		}
+		CASE (LAMPTIME):
+		{
+			if(byte(sFB, 6) = 131) // \x83
+			{
+				// \xAA\xFF\x01\x04A\x83\x14eA = \xAA\xFF\x01\x04\x41\x83\x14\x65\x41
+				iRRR = byte(sFB, 7);
+                iRRR = iRRR * 255;
+				iRRR = iRRR + byte(sFB, 8);
+				iRunTime = iRRR / 6;
+				LCDRunTime = iRunTime;
+            	lastcommand = 255;
+			}
+		}
+
+		CASE (VOLCONTROL):
+		{
+        	if (byte(sFB, 6) = 18) //
+			{
+				if (byte(sFB, 5) = 65) // A is ASCII 41 which equals 65 decimal - Acknowledge
+				{
+					iVolume = byte(sFB,7);
+                	LCDVolumeLevel = iVolume * 655;
+					lastcommand = 255;
+				}
+			}
+		}
+
+		CASE (MUTECONTROL):
+		{
+        	if (byte(sFB, 6) = 19) // Confirm its a mute response
+			{
+				if (byte(sFB, 5) = 65) // A is ASCII 41 which equals 65 decimal - Acknowledge
+				{
+					iMute = byte(sFB,7); // 00 is off, 01 is on.
+					LCD_Mute_FB = iMute;
+					lastcommand = 255;
+				}
+			}
+		}
+		DEFAULT:
+		{
+        	lastcommand = 255;
+		}
+
+	}	   
+}
+
+
+
+/*******************************************************************************************
+  Event Handlers
+  (Uncomment and declare additional event handlers as needed)
+*******************************************************************************************/
+
+PUSH RequestSerial
+{
+    //LCD_TXD$ = "\xAA\x0B\xFF\x00\x0A";
+	makestring(sBuild, "\xAA\x0B%s\x00", sID);
+	lastcommand = SERIAL;
+	LCD_TXD$ = AddCSToString(sBuild);
+
+	// If it is address 0 "\xAA\x0B\xFF\x00\x0A"
+    // If it is address 1 "\xAA\x0B\x01\x00\x0C"
+}
+
+PUSH RequestSoftwareVer
+{
+    //LCD_TXD$ = "\xAA\x0E\xFF\x00\x0D";
+    makestring(sBuild, "\xAA\x0E%s\x00", sID);
+	lastcommand = SOFTWARE;
+	LCD_TXD$ = AddCSToString(sBuild);
+	// If it is address 0 "\xAA\x0E\xFF\x00\x0D"
+	// If it is address 1 "\xAA\x0E\x01\x00\x0F"
+
+}
+
+PUSH RequestMaintenanceInfo
+{
+	//LCD_TXD$ = "\xAA\x0D\xFF\x00\x0C";
+	lastcommand = MAINTAIN;
+	makestring(sBuild, "\xAA\x0D%s\x00", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH LCD_Status_Req
+{
+	lastcommand = STATUSCONTROL;
+	makestring(sBuild, "\xAA\x00%s\x00", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+
+}
+
+PUSH LCD_Panel_Runtime
+{
+	lastcommand = LAMPTIME;
+	makestring(sBuild, "\xAA\x83%s\x00", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+
+}
+
+CHANGE LCD_ID
+{
+	//sID2 = itoa(LCD_ID);
+	sID = chr(LCD_ID);
+	iID = LCD_ID;
+}
+
+PUSH Key_Menu
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x1A", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Exit
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x2D", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Return
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x58", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Enter
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x68", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Up
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x60", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Down
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x61", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Left
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x65", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Right
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x62", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Key_Tools
+{
+    lastcommand = VIRTUAL;
+	makestring(sBuild, "\xAA\xB0%s\x01\x4B", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH LCD_Power_On
+{
+    lastcommand = POWER;
+	makestring(sBuild, "\xAA\x11%s\x01\x01", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+	iPowerReq = 1;
+}
+
+PUSH LCD_Power_Off
+{
+    lastcommand = POWER;
+	makestring(sBuild, "\xAA\x11%s\x01\x00", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+	iPowerReq = 0;
+}
+
+// Input source switching
+PUSH Input_HDMI1
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x21", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_HDMI2
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x23", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_HDMI3
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x31", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_DVI
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x18", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_DPort
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x25", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_VGA
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x14", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_DTV
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x40", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_PIM
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x50", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_HDBaseT
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x55", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Input_MagicInfo
+{
+    lastcommand = INPUTS;
+	makestring(sBuild, "\xAA\x14%s\x01\x20", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Volume_Up
+{
+    lastcommand = VOLCONTROL;
+	if(iVolume < 100)
+		iVolume = iVolume + 1;
+    
+	makestring(sBuild, "\xAA\x12%s\x01%s", sID, chr(iVolume));
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Volume_Down
+{
+    lastcommand = VOLCONTROL;
+	if(iVolume > 0)
+		iVolume = iVolume - 1;
+    
+	makestring(sBuild, "\xAA\x12%s\x01%s", sID, chr(iVolume));
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Mute
+{
+	lastcommand = MUTECONTROL;
+	iMute = 1; // Set to On
+	makestring(sBuild, "\xAA\x13%s\x01%s", sID, chr(iMute));
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Unmute
+{
+	lastcommand = MUTECONTROL;
+	iMute = 0; // Set to Off
+	makestring(sBuild, "\xAA\x13%s\x01%s", sID, chr(iMute));
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Mute_Toggle
+{
+	lastcommand = MUTECONTROL;
+	if(iMute = 1)
+		iMute = 0; // Set to Off
+	else
+        iMute = 1; // Set to On
+
+	makestring(sBuild, "\xAA\x13%s\x01%s", sID, chr(iMute));
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Vol_Reset
+{
+	ResetVolume();
+}
+
+PUSH Channel_Up
+{
+	lastcommand = CHANCONTROL;
+	makestring(sBuild, "\xAA\x61%s\x01\x00", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+PUSH Channel_Down
+{
+	lastcommand = CHANCONTROL;
+	makestring(sBuild, "\xAA\x61%s\x01\x01", sID);
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+CHANGE Volume_Default
+{
+    ResetVolume();
+}
+
+CHANGE Volume_Slider_Drive
+{
+	lastcommand = VOLCONTROL;
+	iVolume = Volume_Slider_Drive / 655; // Divide 65535 by 655 gives 100 range   
+	makestring(sBuild, "\xAA\x12%s\x01%s", sID, chr(iVolume));
+	LCD_TXD$ = AddCSToString(sBuild);	
+}
+
+CHANGE LCD_RXD$
+{
+    sTemp = LCD_RXD$;
+	if(iBusy = 0)
+	{
+		if(find("\xAA",sTemp,1))
+		{
+			delay(20);
+     		iBusy = 1;
+			ProcessRXD(sTemp);
+			ProcessLogic();
+			CLEARBUFFER(LCD_RXD$);
+			iBusy = 0;
+		}
+	}
+}
+
+CHANGE TV_Channel
+{
+	lastcommand = DTVCHANNEL;
+	iCH = TV_Channel;   
+	makestring(sBuild, "\xAA\x17%s\x08\x00\x01\x00%s\x00\x00\x00\x00", sID, chr(iCH));
+	LCD_TXD$ = AddCSToString(sBuild);	
+}
+
+
+PUSH Key_Number
+{
+	integer iDigi, iKeyV;
+
+	iDigi = getlastmodifiedarrayindex();
+
+    lastcommand = VIRTUAL;
+
+    switch(iDigi)
+	{
+		case(0): iKeyV = 17;
+		case(1): iKeyV = 4;
+		case(2): iKeyV = 5;
+		case(3): iKeyV = 6;
+		case(4): iKeyV = 8;
+		case(5): iKeyV = 9;
+		case(6): iKeyV = 10;
+		case(7): iKeyV = 12;
+		case(8): iKeyV = 13;
+		case(9): iKeyV = 14;
+    }
+	makestring(sBuild, "\xAA\xB0%s\x01%s", sID, chr(iKeyV));
+	LCD_TXD$ = AddCSToString(sBuild);
+}
+
+
+/*******************************************************************************************
+  Main()
+  Uncomment and place one-time startup code here
+  (This code will get called when the system starts up)
+*******************************************************************************************/
+
+Function Main()
+{
+    // TODO:  Add code here
+    // Initialize declared global and local variables/arrays as needed.
+    iBusy = 0;
+	sID = chr(254);
+	iID = 254;
+    WaitForInitializationComplete();
+}
+
+
